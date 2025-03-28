@@ -12,7 +12,7 @@ struct Stack<T> {
     mutating func pop() -> T? {
         stack.popLast()
     }
-    
+
     var isEmpty: Bool { stack.isEmpty }
     
     var top: T? { stack.last }
