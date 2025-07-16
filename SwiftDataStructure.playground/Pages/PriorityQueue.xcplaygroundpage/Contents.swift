@@ -136,7 +136,7 @@ print(heap.heap)
 heap.pop()
 print(heap.heap)
 
-// remove(at:)에서 shiftUp이 필요한 이유: https://stackoverflow.com/questions/68510425/removing-value-from-heap-why-siftup-and-siftdown-need-to-be-calledㅇㅇ
+// remove(at:)에서 shiftUp이 필요한 이유: https://stackoverflow.com/questions/68510425/removing-value-from-heap-why-siftup-and-siftdown-need-to-be-called
 
 // MARK: - 최소 우선순위 큐 사용 예시 (가장 작은 숫자가 먼저 나옴)
 print("--- 최소 우선순위 큐 ---")
@@ -181,5 +181,6 @@ while let element = maxPriorityQueue.dequeue() {
 
 
 //: [Next](@next)
+
 
 
