@@ -155,4 +155,39 @@ extension RedBlackTree {
     }
 }
 
+extension RedBlackTree {
+    /// 트리를 콘솔에 시각적으로 출력
+    func printTree() {
+        print("Red-Black Tree:")
+        printSubtree(root, prefix: "", isTail: true)
+    }
+    
+    private func printSubtree(_ node: RBNode<T>?, prefix: String, isTail: Bool) {
+        guard let node = node else {
+            print(prefix + (isTail ? "└── " : "├── ") + "nil ⚫️")
+            return
+        }
+        
+        let color = node.color == .red ? "🔴" : "⚫️"
+        print(prefix + (isTail ? "└── " : "├── ") + "\(node.value) \(color)")
+        
+        let children = [node.left, node.right]
+        for (index, child) in children.enumerated() {
+            let isLast = index == children.count - 1
+            printSubtree(child, prefix: prefix + (isTail ? "    " : "│   "), isTail: isLast)
+        }
+    }
+}
+
+let tree = RedBlackTree<Int>()
+tree.insert(10)
+tree.insert(5)
+tree.insert(20)
+tree.insert(15)
+tree.insert(25)
+tree.insert(3)
+tree.insert(7)
+
+tree.printTree()
+
 //: [Next](@next)
