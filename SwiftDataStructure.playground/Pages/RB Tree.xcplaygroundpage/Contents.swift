@@ -28,7 +28,7 @@ extension RBNode {
     
     var sibling: RBNode? {
         guard let parent = parent else { return nil }
-        return parent.left?.value == self.value ? parent.right : parent.left
+        return parent.left === self ? parent.right : parent.left
     }
     
     var grandparent: RBNode? { parent?.parent }
