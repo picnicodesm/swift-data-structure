@@ -47,6 +47,26 @@ final class RedBlackTree<T: Comparable> {
         insertBST(newNode)
         fixAfterInsertion(newNode)
     }
+    
+    func delete(_ value: T) {
+        guard let node = search(value, from: root) else {
+            print("삭제할 값 \(value)를 찾을 수 없습니다.")
+            return
+        }
+        deleteNode(node)
+    }
+    
+    private func search(_ value: T, from node: RBNode<T>?) -> RBNode<T>? {
+        guard let node = node else { return nil }
+        
+        if value < node.value {
+            return search(value, from: node.left)
+        } else if value > node.value {
+            return search(value, from: node.right)
+        } else {
+            return node
+        }
+    }
 }
 
 extension RedBlackTree {
@@ -152,6 +172,139 @@ extension RedBlackTree {
         
         left.right = node
         node.parent = left
+    }
+    
+    private func deleteNode(_ node: RBNode<T>) {
+        var target = node
+        var originalColor = target.color // 실제 삭데죄는 노드의 색상
+        
+        var replacement: RBNode<T>?
+        
+        // 자식이 둘인 경우 -> successor 찾기
+        if let successor = minimum(node.right) {
+            originalColor = successor.color
+            replacement = successor.right // 삭제하려던 노드의 자리를 successor가 대신함
+            
+            transplant(successor, to: successor.right) // 후계자를 그 오른쪽 자식으로 대체해서, 후계자를 삭제한 효과를 줌
+            
+            successor.left = node.left // successor의 하위 노드들을 삭제하려는 노드의 하위 노드(서브 트리)들로 바꿔줌
+            successor.left?.parent = successor
+            successor.right = node.right
+            successor.right?.parent = successor
+            successor.color = node.color
+            
+            transplant(node, to: successor) // node 자체를 successor로 대체
+        } else {
+            // 자식이 하나 또는 없음
+            replacement = node.left ?? node.right // 있다면 작은 값이 위로 올라와야 하므로 left를 먼저 작성한다.
+            transplant(node, to: replacement)
+            // TODO: - 하나 있는 자식이 레드 노드일 때 black으로 바꿔줘야 하지 않나? 이것도 더블 블랙을 처리하나?
+        }
+        
+        // 삭제된 노드가 black이면 double-black 처리
+        if originalColor == .black {
+            fixAfterDeletion(replacement, parent: node.parent)
+        }
+    }
+    
+    private func transplant(_ old: RBNode<T>, to new: RBNode<T>?) { // 부모와의 연결만을 담당해주는 함수
+        if old.parent == nil {
+            root = new
+        } else if old === old.parent?.left {
+            old.parent?.left = new
+        } else {
+            old.parent?.right = new
+        }
+        
+        new?.parent = old.parent
+    }
+    
+    private func minimum(_ node: RBNode<T>?) -> RBNode<T>? { // 오른쪽 서브 트리의 최솟값을 찾아줌.
+        var current = node
+        while let next = current?.left {
+            current = next
+        }
+        return current
+    }
+    
+    private func fixAfterDeletion(_ node: RBNode<T>?, parent: RBNode<T>?) {
+        var node = node
+        var parent = parent
+
+        while node !== root && (node?.isBlack ?? true) {
+            if node === parent?.left {
+                var sibling = parent?.right
+
+                // Case 1: sibling is red
+                if sibling?.isRed == true {
+                    sibling?.color = .black
+                    parent?.color = .red
+                    rotateLeft(parent!)
+                    sibling = parent?.right
+                }
+
+                // Case 2: sibling and both children black
+                if (sibling?.left?.isBlack ?? true) && (sibling?.right?.isBlack ?? true) {
+                    sibling?.color = .red
+                    node = parent
+                    parent = node?.parent
+                } else {
+                    // Case 3: sibling is black, sibling.left is red, sibling.right is black
+                    if sibling?.right?.isBlack ?? true {
+                        sibling?.left?.color = .black
+                        sibling?.color = .red
+                        if let sibling = sibling {
+                            rotateRight(sibling)
+                        }
+                        sibling = parent?.right
+                    }
+
+                    // Case 4
+                    sibling?.color = parent?.color ?? .black // ??는 의미 없는 코드
+                    parent?.color = .black
+                    sibling?.right?.color = .black
+                    if let parent = parent {
+                        rotateLeft(parent)
+                    }
+                    node = root
+                }
+            } else {
+                // 대칭 처리: node가 오른쪽 자식인 경우
+                var sibling = parent?.left
+
+                if sibling?.isRed == true {
+                    sibling?.color = .black
+                    parent?.color = .red
+                    rotateRight(parent!)
+                    sibling = parent?.left
+                }
+
+                if (sibling?.left?.isBlack ?? true) && (sibling?.right?.isBlack ?? true) {
+                    sibling?.color = .red
+                    node = parent
+                    parent = node?.parent
+                } else {
+                    if sibling?.left?.isBlack ?? true {
+                        sibling?.right?.color = .black
+                        sibling?.color = .red
+                        if let sibling = sibling {
+                            rotateLeft(sibling)
+                        }
+                        sibling = parent?.left
+                    }
+
+                    sibling?.color = parent?.color ?? .black
+                    parent?.color = .black
+                    sibling?.left?.color = .black
+                    if let parent = parent {
+                        rotateRight(parent)
+                    }
+                    node = root
+                }
+            }
+        }
+
+        node?.color = .black
     }
 }
 
