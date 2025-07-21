@@ -179,6 +179,56 @@ extension RedBlackTree {
     }
 }
 
+extension RedBlackTree {
+    /// 전체 트리가 유효한 RB 트리인지 확인
+    func isValidRedBlackTree() -> Bool {
+        // 조건 2: 루트는 black이어야 함
+        if let root = root, root.isRed {
+            print("❌ 루트 노드가 RED입니다.")
+            return false
+        }
+
+        // 실제 검사는 재귀 함수로 수행
+        let (isValid, _) = checkSubtree(node: root)
+        return isValid
+    }
+
+    /// 서브트리를 재귀적으로 검사하며, (유효성 여부, black-height) 반환
+    private func checkSubtree(node: RBNode<T>?) -> (Bool, Int) {
+        // nil = 리프 노드 → black-height = 1
+        guard let node = node else {
+            return (true, 1)
+        }
+
+        // 조건 4: red 노드의 자식은 black이어야 함
+        if node.isRed {
+            if node.left?.isRed == true || node.right?.isRed == true {
+                print("❌ 연속된 빨간 노드가 발견됨: \(node.value)")
+                return (false, 0)
+            }
+        }
+
+        // 좌/우 서브트리 검증
+        let (leftValid, leftBlackHeight) = checkSubtree(node: node.left)
+        let (rightValid, rightBlackHeight) = checkSubtree(node: node.right)
+
+        if !leftValid || !rightValid {
+            return (false, 0)
+        }
+
+        // 조건 5: 좌우 서브트리의 black-height 일치해야 함
+        if leftBlackHeight != rightBlackHeight {
+            print("❌ black-height 불일치: \(node.value), left: \(leftBlackHeight), right: \(rightBlackHeight)")
+            return (false, 0)
+        }
+
+        // 현재 노드가 black이면 +1
+        let currentBlackHeight = node.isBlack ? leftBlackHeight + 1 : leftBlackHeight
+
+        return (true, currentBlackHeight)
+    }
+}
+
 let tree = RedBlackTree<Int>()
 tree.insert(10)
 tree.insert(5)
@@ -189,5 +239,12 @@ tree.insert(3)
 tree.insert(7)
 
 tree.printTree()
+
+
+if tree.isValidRedBlackTree() {
+    print("✅ 트리는 유효한 Red-Black Tree입니다.")
+} else {
+    print("❌ 트리는 유효하지 않습니다.")
+}
 
 //: [Next](@next)
