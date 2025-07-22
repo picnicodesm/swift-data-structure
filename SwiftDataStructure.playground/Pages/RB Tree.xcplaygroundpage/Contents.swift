@@ -23,7 +23,7 @@ final class RBNode<Value: Comparable> {
 
 extension RBNode {
     var isRed: Bool { color == .red }
-
+    
     var isBlack: Bool { color == .black }
     
     var sibling: RBNode? {
@@ -49,23 +49,25 @@ final class RedBlackTree<T: Comparable> {
     }
     
     func delete(_ value: T) {
-        guard let node = search(value, from: root) else {
+        guard let node = search(value) else {
             print("삭제할 값 \(value)를 찾을 수 없습니다.")
             return
         }
         deleteNode(node)
     }
     
-    private func search(_ value: T, from node: RBNode<T>?) -> RBNode<T>? {
-        guard let node = node else { return nil }
-        
-        if value < node.value {
-            return search(value, from: node.left)
-        } else if value > node.value {
-            return search(value, from: node.right)
-        } else {
-            return node
+    func search(_ value: T) -> RBNode<T>? {
+        var current = root
+        while let node = current {
+            if value == node.value {
+                return node
+            } else if value < node.value {
+                current = node.left
+            } else {
+                current = node.right
+            }
         }
+        return nil
     }
 }
 
@@ -175,35 +177,44 @@ extension RedBlackTree {
     }
     
     private func deleteNode(_ node: RBNode<T>) {
-        var target = node
-        var originalColor = target.color // 실제 삭데죄는 노드의 색상
+        var deleteNode: RBNode<T> = node      // 실제로 제거되는 노드(node 또는 successor)
+        var replacement: RBNode<T>?          // deleteNode의 대체 노드
+        var replacementParent: RBNode<T>?    // 대체 노드의 부모 노드(Double Black을 처리하기 위함)
         
-        var replacement: RBNode<T>?
+        var deleteNodeColor = deleteNode.color
         
-        // 자식이 둘인 경우 -> successor 찾기
-        if let successor = minimum(node.right) {
-            originalColor = successor.color
-            replacement = successor.right // 삭제하려던 노드의 자리를 successor가 대신함
+        // Case 1: 자식 노드가 없거나 1개인 경우
+        if node.left == nil || node.right == nil {
+            replacement = node.left ?? node.right
+            replacementParent = node.parent
+            transplant(deleteNode, to: replacement)
+        }
+        // Case 2: 삭제할 노드(node)에 두 개의 자식이 있는 경우
+        else {
+            deleteNode = minimum(node.right!)   // successor
+            deleteNodeColor = deleteNode.color
             
-            transplant(successor, to: successor.right) // 후계자를 그 오른쪽 자식으로 대체해서, 후계자를 삭제한 효과를 줌
+            replacement = deleteNode.right
             
-            successor.left = node.left // successor의 하위 노드들을 삭제하려는 노드의 하위 노드(서브 트리)들로 바꿔줌
-            successor.left?.parent = successor
-            successor.right = node.right
-            successor.right?.parent = successor
-            successor.color = node.color
+            // 바로 아래 오른쪽 자식이 아닌 경우
+            if deleteNode.parent !== node {
+                replacementParent = deleteNode.parent
+                transplant(deleteNode, to: deleteNode.right)
+                
+                deleteNode.right = node.right
+                deleteNode.right?.parent = deleteNode
+            } else {
+                replacementParent = deleteNode
+            }
             
-            transplant(node, to: successor) // node 자체를 successor로 대체
-        } else {
-            // 자식이 하나 또는 없음
-            replacement = node.left ?? node.right // 있다면 작은 값이 위로 올라와야 하므로 left를 먼저 작성한다.
-            transplant(node, to: replacement)
-            // TODO: - 하나 있는 자식이 레드 노드일 때 black으로 바꿔줘야 하지 않나? 이것도 더블 블랙을 처리하나?
+            transplant(node, to: deleteNode)
+            deleteNode.left = node.left
+            deleteNode.left?.parent = deleteNode
+            deleteNode.color = node.color
         }
         
-        // 삭제된 노드가 black이면 double-black 처리
-        if originalColor == .black {
-            fixAfterDeletion(replacement, parent: node.parent)
+        if deleteNodeColor == .black {
+            fixAfterDeletion(replacement, parent: replacementParent)
         }
     }
     
@@ -219,9 +230,9 @@ extension RedBlackTree {
         new?.parent = old.parent
     }
     
-    private func minimum(_ node: RBNode<T>?) -> RBNode<T>? { // 오른쪽 서브 트리의 최솟값을 찾아줌.
+    private func minimum(_ node: RBNode<T>) -> RBNode<T> { // 오른쪽 서브 트리의 최솟값을 찾아줌.
         var current = node
-        while let next = current?.left {
+        while let next = current.left {
             current = next
         }
         return current
@@ -230,11 +241,11 @@ extension RedBlackTree {
     private func fixAfterDeletion(_ node: RBNode<T>?, parent: RBNode<T>?) {
         var node = node
         var parent = parent
-
+        
         while node !== root && (node?.isBlack ?? true) {
             if node === parent?.left {
                 var sibling = parent?.right
-
+                
                 // Case 1: sibling is red
                 if sibling?.isRed == true {
                     sibling?.color = .black
@@ -242,7 +253,7 @@ extension RedBlackTree {
                     rotateLeft(parent!)
                     sibling = parent?.right
                 }
-
+                
                 // Case 2: sibling and both children black
                 if (sibling?.left?.isBlack ?? true) && (sibling?.right?.isBlack ?? true) {
                     sibling?.color = .red
@@ -258,27 +269,27 @@ extension RedBlackTree {
                         }
                         sibling = parent?.right
                     }
-
+                    
                     // Case 4
-                    sibling?.color = parent?.color ?? .black // ??는 의미 없는 코드
+                    sibling?.color = parent!.color
                     parent?.color = .black
                     sibling?.right?.color = .black
                     if let parent = parent {
                         rotateLeft(parent)
                     }
-                    node = root
+                    break
                 }
             } else {
                 // 대칭 처리: node가 오른쪽 자식인 경우
                 var sibling = parent?.left
-
+                
                 if sibling?.isRed == true {
                     sibling?.color = .black
                     parent?.color = .red
                     rotateRight(parent!)
                     sibling = parent?.left
                 }
-
+                
                 if (sibling?.left?.isBlack ?? true) && (sibling?.right?.isBlack ?? true) {
                     sibling?.color = .red
                     node = parent
@@ -292,18 +303,18 @@ extension RedBlackTree {
                         }
                         sibling = parent?.left
                     }
-
-                    sibling?.color = parent?.color ?? .black
+                    
+                    sibling?.color = parent!.color
                     parent?.color = .black
                     sibling?.left?.color = .black
                     if let parent = parent {
                         rotateRight(parent)
                     }
-                    node = root
+                    break
                 }
             }
         }
-
+        
         node?.color = .black
     }
 }
@@ -330,74 +341,160 @@ extension RedBlackTree {
             printSubtree(child, prefix: prefix + (isTail ? "    " : "│   "), isTail: isLast)
         }
     }
+    
+    
+    // MARK: - Tree Printing
+       /// 트리를 콘솔에 90도 회전된 형태로 시각화
+       func drawDiagram() {
+           print(diagram(for: self.root))
+       }
+
+       /// `drawDiagram`을 위한 재귀 헬퍼 함수
+       private func diagram(for node: RBNode<T>?,
+                            _ top: String = "",
+                            _ rootPrefix: String = "", // 현재 노드에 붙는 접두사 (ex: "───", "┌──", "└──")
+                            _ bottom: String = "") -> String {
+           guard let node = node else {
+               // nil 노드는 항상 블랙(⚫️)으로 명시적으로 출력됩니다.
+               // nil 노드는 리프 노드이므로, '마지막 가지' 형태인 "└──"를 사용합니다.
+               // 또는 부모로부터 상속받은 rootPrefix를 활용할 수도 있습니다.
+               return rootPrefix + "nil ⚫️\n"
+           }
+
+           let colorSymbol = node.color == .black ? "⚫️" : "🔴"
+
+           // 오른쪽 자식 -> 현재 노드 -> 왼쪽 자식 순서로 재귀 호출하여 시각화
+           // 중요: prefix 문자열들이 다음 레벨의 "가지"를 올바르게 형성하도록 조정합니다.
+
+           // 오른쪽 자식 호출: 'top'은 오른쪽 자식의 부모 경로 (현재 노드 오른쪽 위)
+           //                   'rootPrefix'는 오른쪽 자식에 붙을 가지 (┌──)
+           //                   'bottom'은 오른쪽 자식의 아래 경로 (│   )
+           let rightSubtree = diagram(for: node.right,
+                                      top + "    ",         // 다음 레벨 'top'
+                                      top + "┌── ",          // 다음 레벨 'rootPrefix'
+                                      top + "│   ")          // 다음 레벨 'bottom'
+
+           // 현재 노드 출력
+           let currentNode = rootPrefix + "\(node.value) \(colorSymbol)\n"
+
+           // 왼쪽 자식 호출: 'top'은 왼쪽 자식의 부모 경로 (현재 노드 왼쪽 위)
+           //                   'rootPrefix'는 왼쪽 자식에 붙을 가지 (└──)
+           //                   'bottom'은 왼쪽 자식의 아래 경로 (    )
+           let leftSubtree = diagram(for: node.left,
+                                     bottom + "│   ",       // 다음 레벨 'top'
+                                     bottom + "└── ",        // 다음 레벨 'rootPrefix'
+                                     bottom + "    ")        // 다음 레벨 'bottom'
+
+           return rightSubtree + currentNode + leftSubtree
+       }
 }
 
-extension RedBlackTree {
-    /// 전체 트리가 유효한 RB 트리인지 확인
-    func isValidRedBlackTree() -> Bool {
-        // 조건 2: 루트는 black이어야 함
-        if let root = root, root.isRed {
-            print("❌ 루트 노드가 RED입니다.")
-            return false
-        }
 
-        // 실제 검사는 재귀 함수로 수행
-        let (isValid, _) = checkSubtree(node: root)
-        return isValid
-    }
+// MARK: - Red-Black Tree Operations Test Scenarios
 
-    /// 서브트리를 재귀적으로 검사하며, (유효성 여부, black-height) 반환
-    private func checkSubtree(node: RBNode<T>?) -> (Bool, Int) {
-        // nil = 리프 노드 → black-height = 1
-        guard let node = node else {
-            return (true, 1)
-        }
+let rbTree = RedBlackTree<Int>()
 
-        // 조건 4: red 노드의 자식은 black이어야 함
-        if node.isRed {
-            if node.left?.isRed == true || node.right?.isRed == true {
-                print("❌ 연속된 빨간 노드가 발견됨: \(node.value)")
-                return (false, 0)
-            }
-        }
+print("--- Red-Black Tree 삽입/삭제 시나리오 시작 ---\n")
 
-        // 좌/우 서브트리 검증
-        let (leftValid, leftBlackHeight) = checkSubtree(node: node.left)
-        let (rightValid, rightBlackHeight) = checkSubtree(node: node.right)
+// MARK: - 삽입 시나리오
+print("➡️ 삽입: 10")
+rbTree.insert(10)
+rbTree.drawDiagram()
 
-        if !leftValid || !rightValid {
-            return (false, 0)
-        }
+print("➡️ 삽입: 20")
+rbTree.insert(20)
+rbTree.drawDiagram()
 
-        // 조건 5: 좌우 서브트리의 black-height 일치해야 함
-        if leftBlackHeight != rightBlackHeight {
-            print("❌ black-height 불일치: \(node.value), left: \(leftBlackHeight), right: \(rightBlackHeight)")
-            return (false, 0)
-        }
+print("➡️ 삽입: 30")
+rbTree.insert(30)
+rbTree.drawDiagram()
 
-        // 현재 노드가 black이면 +1
-        let currentBlackHeight = node.isBlack ? leftBlackHeight + 1 : leftBlackHeight
+print("➡️ 삽입: 15")
+rbTree.insert(15)
+rbTree.drawDiagram()
 
-        return (true, currentBlackHeight)
-    }
-}
+print("➡️ 삽입: 5")
+rbTree.insert(5)
+rbTree.drawDiagram()
 
-let tree = RedBlackTree<Int>()
-tree.insert(10)
-tree.insert(5)
-tree.insert(20)
-tree.insert(15)
-tree.insert(25)
-tree.insert(3)
-tree.insert(7)
+print("➡️ 삽입: 25")
+rbTree.insert(25)
+rbTree.drawDiagram()
 
-tree.printTree()
+print("➡️ 삽입: 35")
+rbTree.insert(35)
+rbTree.drawDiagram()
+
+print("➡️ 삽입: 2")
+rbTree.insert(2)
+rbTree.drawDiagram()
+
+print("➡️ 삽입: 7")
+rbTree.insert(7)
+rbTree.drawDiagram()
+
+print("➡️ 삽입: 12")
+rbTree.insert(12)
+rbTree.drawDiagram()
+
+print("➡️ 삽입: 18")
+rbTree.insert(18)
+rbTree.drawDiagram()
+
+print("\n--- 모든 삽입 완료 ---\n")
+
+// MARK: - 삭제 시나리오
+print("➡️ 삭제: 25)")
+rbTree.delete(25)
+rbTree.drawDiagram()
+
+print("➡️ 삭제: 5")
+rbTree.delete(5)
+rbTree.drawDiagram()
+
+print("➡️ 삭제: 30")
+rbTree.delete(30)
+rbTree.drawDiagram()
+
+print("➡️ 삭제: 10")
+rbTree.delete(10)
+rbTree.drawDiagram()
+
+print("➡️ 삭제: 2")
+rbTree.delete(2)
+rbTree.drawDiagram()
+
+print("➡️ 삭제: 7")
+rbTree.delete(7)
+rbTree.drawDiagram()
+
+print("➡️ 삭제: 12")
+rbTree.delete(12)
+rbTree.drawDiagram()
+
+print("➡️ 삭제: 18")
+rbTree.delete(18)
+rbTree.drawDiagram()
+
+print("➡️ 삭제: 35")
+rbTree.delete(35)
+rbTree.drawDiagram()
+
+print("➡️ 삭제: 20")
+rbTree.delete(20)
+rbTree.drawDiagram()
+
+print("➡️ 존재하지 않는 값 삭제 시도: 99")
+rbTree.delete(99)
+rbTree.drawDiagram()
+
+print("\n--- Red-Black Tree 삽입/삭제 시나리오 종료 ---")
 
 
-if tree.isValidRedBlackTree() {
-    print("✅ 트리는 유효한 Red-Black Tree입니다.")
-} else {
-    print("❌ 트리는 유효하지 않습니다.")
-}
 
 //: [Next](@next)
+
+
+
+
+
